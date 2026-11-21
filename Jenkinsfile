@@ -1,26 +1,32 @@
+#!groovy
 pipeline {
-    agent any
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+  agent none
+  stages {
+    stage('Maven Install') {
+      agent {
+        docker {
+          image 'maven:3.9-eclipse-temurin-25'
+          reuseNode true
         }
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    app = docker.build("mjpolania331/spring-petclinic:latest")
-                }
-            }
-        }
-        stage('Push to DockerHub') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        app.push("latest")
-                    }
-                }
-            }
-        }
+      }
+      steps {
+        sh 'mvn clean install'
+      }
     }
+    stage('Docker Build') {
+      agent any
+      steps {
+        sh 'docker build -t <tu-usuario-dockerhub>/spring-petclinic:gestion-udem-jenkins .'
+      }
+    }
+    stage('Docker Push') {
+      agent any
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerHub', passwordVariable: 'dockerHubPassword', usernameVariable: 'dockerHubUser')]) {
+          sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPassword}"
+          sh 'docker push <tu-usuario-dockerhub>/spring-petclinic:gestion-udem-jenkins'
+        }
+      }
+    }
+  }
 }
